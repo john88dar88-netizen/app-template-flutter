@@ -5,6 +5,9 @@ import jwt
 from jwt import PyJWKClient
 from datetime import datetime
 import os
+from appwrite.client import Client
+from appwrite.services.account import Account
+
 
 app = FastAPI(title="Auth Backend API", version="1.0.0")
 
@@ -24,52 +27,19 @@ APPWRITE_ENDPOINT = os.getenv("APPWRITE_ENDPOINT", "https://cloud.appwrite.io/v1
 # JWT verification using Appwrite's JWKs endpoint
 jwks_url = f"{APPWRITE_ENDPOINT}/jwks/{APPWRITE_PROJECT_ID}"
 
+def verify_jwt_token(authorization: str = Header(...)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
 
-def verify_jwt_token(authorization: Optional[str] = Header(None)) -> dict:
-    """
-    Verify JWT token from Appwrite
-    """
-    try:
-        token = authorization.replace("Bearer ", "")
-        print(f"Token: {token}")
-        jwks_client = PyJWKClient(jwks_url)
-        signing_key = jwks_client.get_signing_key_from_jwt(token)
-        print(f"Signing Key: {signing_key}")
-        payload = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["RS256"],
-            audience=APPWRITE_PROJECT_ID,
-        )
-        print(f"Payload: {payload}")
-        return payload
-    except Exception as e:
-        print(f"JWT Verification Error: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
-    
-    try:
-        # Extract token from "Bearer <token>"
-        token = authorization.replace("Bearer ", "")
-        print('token',token)
-        # Get JWK client
-        jwks_client = PyJWKClient(jwks_url)
-        signing_key = jwks_client.get_signing_key_from_jwt(token)
-        
-        # Decode and verify token
-        payload = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["RS256"],
-            audience=APPWRITE_PROJECT_ID,
-        )
-        
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+    token = authorization.replace("Bearer ", "")
+
+    client = Client()
+    client.set_endpoint(APPWRITE_ENDPOINT)
+    client.set_project(APPWRITE_PROJECT_ID)
+    client.set_jwt(token)
+
+    account = Account(client)
+    return account.get()
 
 
 @app.get("/")
