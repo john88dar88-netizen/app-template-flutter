@@ -29,8 +29,23 @@ def verify_jwt_token(authorization: Optional[str] = Header(None)) -> dict:
     """
     Verify JWT token from Appwrite
     """
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header missing")
+    try:
+        token = authorization.replace("Bearer ", "")
+        print(f"Token: {token}")
+        jwks_client = PyJWKClient(jwks_url)
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        print(f"Signing Key: {signing_key}")
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=APPWRITE_PROJECT_ID,
+        )
+        print(f"Payload: {payload}")
+        return payload
+    except Exception as e:
+        print(f"JWT Verification Error: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
     
     try:
         # Extract token from "Bearer <token>"
